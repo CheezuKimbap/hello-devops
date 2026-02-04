@@ -2,19 +2,19 @@ pipeline {
     agent any
 
     stages {
-        stage('Build Image') {
+       stage('Build') {
             agent {
                 docker {
                     image 'docker:cli'
-                    // This shares the host's docker socket with the temporary container
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
             steps {
-                sh 'docker build -t k3d-dev-cluster-registry:5000/hello-alpine:v1 .'
-                sh 'docker push k3d-dev-cluster-registry:5000/hello-alpine:v1'
+                echo 'Building Docker Image...'
+                sh 'docker build -t localhost:5000/hello-arch:v1 .'
             }
         }
+
 
         stage('Deploy to K8s') {
             agent {
