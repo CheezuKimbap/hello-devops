@@ -1,22 +1,31 @@
 pipeline {
     agent any
+
     stages {
-        stage('Build') {
-            steps {
-                // Building the alpine version
-                sh 'docker build -t k3d-dev-cluster-registry:5000/hello-alpine:v1 .'
+        stage('Build Image') {
+            agent {
+                docker {
+                    image 'docker:cli'
+                    // This shares the host's docker socket with the temporary container
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
             }
-        }
-        stage('Push') {
             steps {
-                // Pushing to your local k3d registry
+                sh 'docker build -t k3d-dev-cluster-registry:5000/hello-alpine:v1 .'
                 sh 'docker push k3d-dev-cluster-registry:5000/hello-alpine:v1'
             }
         }
-        stage('Deploy') {
+
+        stage('Deploy to K8s') {
+            agent {
+                docker { image 'bitnami/kubectl:latest' }
+            }
             steps {
-                // Running it in Kubernetes
-                sh 'kubectl run hello-web --image=k3d-dev-cluster-registry:5000/hello-alpine:v1 --port=80 --overrides=\'{"spec": {"containers": [{"name": "hello-web", "image": "k3d-dev-cluster-registry:5000/hello-alpine:v1", "ports": [{"containerPort": 80}]}]}}\' || true'
+                // We point to the internal k3d proxy name shown in your docker ps
+                sh 'kubectl config set-cluster dev --server=https://k3d-dev-cluster-serverlb:6443 --insecure-skip-tls-verify=true'
+                sh 'kubectl config set-context dev --cluster=dev'
+                sh 'kubectl config use-context dev'
+                sh 'kubectl run hello-web --image=k3d-dev-cluster-registry:5000/hello-alpine:v1 --port=80'
             }
         }
     }
